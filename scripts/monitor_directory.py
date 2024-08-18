@@ -27,7 +27,7 @@ class NewImageHandler(FileSystemEventHandler):
             # Perform text recognition
             #pass para
             read_lines = read_page(img, DetectorConfig(scale=0.4, margin=5), 
-                                   line_clustering_config=LineClusteringConfig(min_words_per_line=2))
+                                   line_clustering_config=LineClusteringConfig(min_words_per_line=1))
 
             # Save recognized text
             filename = os.path.basename(event.src_path)

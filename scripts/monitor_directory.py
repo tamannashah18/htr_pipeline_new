@@ -4,6 +4,43 @@ import cv2
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from htr_pipeline import read_page, DetectorConfig, LineClusteringConfig
+from autocorrect import Speller
+
+# Initialize the spell checker
+spell = Speller()
+
+# Dictionary to store incorrect letter counts
+incorrect_letter_counts = {}
+
+def correct_word(word):
+    corrected_word = spell(word)
+    if corrected_word != word:
+        # Track incorrect letters and their counts
+        for original_letter, corrected_letter in zip(word, corrected_word):
+            if original_letter != corrected_letter:
+                if original_letter in incorrect_letter_counts:
+                    incorrect_letter_counts[original_letter] += 1
+                else:
+                    incorrect_letter_counts[original_letter] = 1
+    return corrected_word
+
+def read_words_from_file(file_path):
+    with open(file_path, 'r') as file:
+        words = file.read().split()
+    return words
+
+def analyze_text_files(output_dir):
+    for filename in os.listdir(output_dir):
+        if filename.endswith('.txt'):
+            file_path = os.path.join(output_dir, filename)
+            words = read_words_from_file(file_path)
+            for word in words:
+                correct_word(word)
+
+    # Print the incorrect letters and their counts
+    print("Incorrect letters and their counts:")
+    for incorrect_letter, count in incorrect_letter_counts.items():
+        print(f"'{incorrect_letter}' incorrect {count} times")
 
 # Define the directory to monitor
 image_dir = 'data/images'
@@ -25,9 +62,8 @@ class NewImageHandler(FileSystemEventHandler):
             img = cv2.imread(event.src_path, cv2.IMREAD_GRAYSCALE)
 
             # Perform text recognition
-            #pass para
             read_lines = read_page(img, DetectorConfig(scale=0.4, margin=5), 
-                                   line_clustering_config=LineClusteringConfig(min_words_per_line=2))
+                                   line_clustering_config=LineClusteringConfig(min_words_per_line=1))
 
             # Save recognized text
             filename = os.path.basename(event.src_path)
@@ -54,3 +90,6 @@ except KeyboardInterrupt:
     observer.stop()
 
 observer.join()
+
+# Analyze the generated text files for incorrect letters
+analyze_text_files(output_dir)

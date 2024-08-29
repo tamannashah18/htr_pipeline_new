@@ -13,7 +13,7 @@ setup(
                       'opencv-python',
                       'scikit-learn',
                       'editdistance',
-                      'autocorrect'
+                      'autocorrect',
                       'path'],
     python_requires='>=3.8',
     package_data={'htr_pipeline.models': ['*']}

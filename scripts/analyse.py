@@ -22,14 +22,27 @@ total_letter_counts = {}
 excel_file = 'output/letter_incorrect_percentage.xlsx'
 
 def compare_and_track_incorrect_letters(extracted_sentence, corrected_sentence):
-    global total_letter_counts
+    global total_letter_counts, incorrect_letter_counts
 
-    # Compare letters between the extracted and corrected sentences
-    for original_letter, corrected_letter in zip(extracted_sentence, corrected_sentence):
-        if original_letter.isalpha():  # Ensure the character is a letter
-            total_letter_counts[original_letter] = total_letter_counts.get(original_letter, 0) + 1
-            if original_letter != corrected_letter:
-                incorrect_letter_counts[original_letter] = incorrect_letter_counts.get(original_letter, 0) + 1
+    # Split the sentences into words
+    extracted_words = extracted_sentence.lower().split()
+    corrected_words = corrected_sentence.lower().split()
+
+    # Compare words between the extracted and corrected sentences
+    for original_word, corrected_word in zip(extracted_words, corrected_words):
+        # Ensure both words are the same length for comparison
+        if len(original_word) == len(corrected_word):
+            for original_letter, corrected_letter in zip(original_word, corrected_word):
+                if original_letter.isalpha():  # Ensure the character is a letter
+                    total_letter_counts[original_letter] = total_letter_counts.get(original_letter, 0) + 1
+                    if original_letter != corrected_letter:
+                        incorrect_letter_counts[original_letter] = incorrect_letter_counts.get(original_letter, 0) + 1
+        else:
+            # If the words are not the same length, count the entire word as incorrect
+            for original_letter in original_word:
+                if original_letter.isalpha():
+                    total_letter_counts[original_letter] = total_letter_counts.get(original_letter, 0) + 1
+                    incorrect_letter_counts[original_letter] = incorrect_letter_counts.get(original_letter, 0) + 1
 
 def read_text_from_file(file_path):
     with open(file_path, 'r') as file:
@@ -114,9 +127,34 @@ class NewImageHandler(FileSystemEventHandler):
 
         print(f"Data saved to {excel_file}")
 
+        # Analyze and print the results
+        analyze_and_print_results()
+
         # Reset the incorrect letter counts and total letters count for the next image
         incorrect_letter_counts.clear()
         total_letter_counts.clear()
+
+def analyze_and_print_results():
+    print("\nTabular Analysis of Incorrect Letters:")
+    print(f"{'Letter':<10}{'Total Occurrences':<20}{'Incorrect Occurrences':<25}{'Percentage of Inaccuracy':<25}")
+
+    letters_to_practice = []
+
+    for letter in 'abcdefghijklmnopqrstuvwxyz':
+        total_count = total_letter_counts.get(letter, 0)
+        incorrect_count = incorrect_letter_counts.get(letter, 0)
+        inaccuracy_percentage = (incorrect_count / total_count) * 100 if total_count > 0 else 0
+
+        print(f"{letter:<10}{total_count:<20}{incorrect_count:<25}{inaccuracy_percentage:.2f}%")
+
+        if inaccuracy_percentage > 50:
+            letters_to_practice.append(letter)
+
+    if letters_to_practice:
+        print("\nThe letters that need to be practiced:")
+        print(", ".join(letters_to_practice))
+    else:
+        print("\nNo letters need extra practice at this time.")
 
 # Start monitoring the image directory for new files
 event_handler = NewImageHandler()

@@ -20,7 +20,6 @@ total_letter_counts = {}
 
 # Initialize Excel file path
 excel_file = 'output/letter_incorrect_percentage.xlsx'
-
 def compare_and_track_incorrect_letters(extracted_sentence, corrected_sentence):
     global total_letter_counts, incorrect_letter_counts
 
@@ -30,19 +29,33 @@ def compare_and_track_incorrect_letters(extracted_sentence, corrected_sentence):
 
     # Compare words between the extracted and corrected sentences
     for original_word, corrected_word in zip(extracted_words, corrected_words):
-        # Ensure both words are the same length for comparison
-        if len(original_word) == len(corrected_word):
-            for original_letter, corrected_letter in zip(original_word, corrected_word):
-                if original_letter.isalpha():  # Ensure the character is a letter
-                    total_letter_counts[original_letter] = total_letter_counts.get(original_letter, 0) + 1
-                    if original_letter != corrected_letter:
-                        incorrect_letter_counts[original_letter] = incorrect_letter_counts.get(original_letter, 0) + 1
-        else:
-            # If the words are not the same length, count the entire word as incorrect
-            for original_letter in original_word:
+        min_length = min(len(original_word), len(corrected_word))
+        max_length = max(len(original_word), len(corrected_word))
+
+        # Compare letters in both words, up to the length of the shorter word
+        for i in range(min_length):
+            original_letter = original_word[i]
+            corrected_letter = corrected_word[i]
+            if original_letter.isalpha():  # Ensure the character is a letter
+                total_letter_counts[original_letter] = total_letter_counts.get(original_letter, 0) + 1
+                if original_letter != corrected_letter:
+                    incorrect_letter_counts[original_letter] = incorrect_letter_counts.get(original_letter, 0) + 1
+
+        # If the original word is longer, count the extra letters as incorrect
+        if len(original_word) > len(corrected_word):
+            for i in range(min_length, max_length):
+                original_letter = original_word[i]
                 if original_letter.isalpha():
                     total_letter_counts[original_letter] = total_letter_counts.get(original_letter, 0) + 1
                     incorrect_letter_counts[original_letter] = incorrect_letter_counts.get(original_letter, 0) + 1
+
+        # If the corrected word is longer, add the extra letters to total counts (but they aren't incorrect)
+        if len(corrected_word) > len(original_word):
+            for i in range(min_length, max_length):
+                corrected_letter = corrected_word[i]
+                if corrected_letter.isalpha():
+                    total_letter_counts[corrected_letter] = total_letter_counts.get(corrected_letter, 0) + 1
+
 
 def read_text_from_file(file_path):
     with open(file_path, 'r') as file:
@@ -92,7 +105,7 @@ class NewImageHandler(FileSystemEventHandler):
         extracted_sentence = read_text_from_file(txt_file_path).replace('\n', ' ')
 
         # Get the corrected sentence from Gemini
-        response = model.generate_content("Guess the correct sentence and just give me the corrected sentence as the response: " + extracted_sentence)
+        response = model.generate_content("correct the given sentence, make sure to not increase the number of words too much and just give me the corrected sentence as the response: " + extracted_sentence)
         corrected_sentence = response.text.strip()
 
         print(f"Extracted Sentence: {extracted_sentence}")

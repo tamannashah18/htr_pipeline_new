@@ -5,23 +5,31 @@ import htr_pipeline
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from htr_pipeline import read_page, DetectorConfig, LineClusteringConfig
-import google.generativeai as genai  
+import google.generativeai as genai
+import pandas as pd
+from datetime import datetime
+
 # Assuming genai is the correct library
 genai.configure(api_key="AIzaSyBPhRoY7S2I35q460jQTcbLVYcxccPB2Go")
 # Initialize the Gemini model
 model = genai.GenerativeModel('gemini-1.5-flash')
 
-# Dictionary to store incorrect letter counts
+# Dictionaries to store letter counts
 incorrect_letter_counts = {}
+total_letter_counts = {}
+
+# Initialize Excel file path
+excel_file = 'output/letter_incorrect_percentage.xlsx'
 
 def compare_and_track_incorrect_letters(extracted_sentence, corrected_sentence):
+    global total_letter_counts
+
     # Compare letters between the extracted and corrected sentences
     for original_letter, corrected_letter in zip(extracted_sentence, corrected_sentence):
-        if original_letter !=corrected_letter:
-            if original_letter in incorrect_letter_counts:
-                incorrect_letter_counts[original_letter] += 1
-            else:
-                incorrect_letter_counts[original_letter] = 1
+        if original_letter.isalpha():  # Ensure the character is a letter
+            total_letter_counts[original_letter] = total_letter_counts.get(original_letter, 0) + 1
+            if original_letter != corrected_letter:
+                incorrect_letter_counts[original_letter] = incorrect_letter_counts.get(original_letter, 0) + 1
 
 def read_text_from_file(file_path):
     with open(file_path, 'r') as file:
@@ -37,6 +45,8 @@ os.makedirs(output_dir, exist_ok=True)
 # Define the event handler for newly created image files
 class NewImageHandler(FileSystemEventHandler):
     def on_created(self, event):
+        global total_letter_counts  # Declare as global to access the global variable
+
         # Ignore directories and non-image files
         if event.is_directory or not (event.src_path.endswith('.png') or event.src_path.endswith('.jpg')):
             return
@@ -45,6 +55,11 @@ class NewImageHandler(FileSystemEventHandler):
 
         # Read the image as grayscale
         img = cv2.imread(event.src_path, cv2.IMREAD_GRAYSCALE)
+
+        # Check if the image was loaded successfully
+        if img is None:
+            print(f"Failed to load image: {event.src_path}. Please check the file path or image integrity.")
+            return
 
         # Perform text recognition on the image
         read_lines = read_page(img, DetectorConfig(scale=0.4, margin=5), 
@@ -73,11 +88,35 @@ class NewImageHandler(FileSystemEventHandler):
         # Compare the extracted sentence with the corrected sentence and track incorrect letters
         compare_and_track_incorrect_letters(extracted_sentence.lower(), corrected_sentence.lower())
 
-        # Print the incorrect letters and their counts
-        print("Incorrect letters and their counts:")
-        for incorrect_letter, count in incorrect_letter_counts.items():
-            print(f"'{incorrect_letter}' incorrect {count} times")
-        incorrect_letter={}
+        # Create a dictionary to hold the percentages for each letter
+        letter_percentages = {letter: 0 for letter in 'abcdefghijklmnopqrstuvwxyz'}
+        for letter, total_count in total_letter_counts.items():
+            incorrect_count = incorrect_letter_counts.get(letter, 0)
+            letter_percentages[letter] = (incorrect_count / total_count) * 100 if total_count > 0 else 0
+
+        # Add the current timestamp
+        letter_percentages['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        # Load existing data if the Excel file exists, otherwise create a new DataFrame
+        if os.path.exists(excel_file):
+            df = pd.read_excel(excel_file)
+        else:
+            df = pd.DataFrame(columns=['timestamp'] + list('abcdefghijklmnopqrstuvwxyz'))
+
+        # Create a new DataFrame for the current row
+        new_row = pd.DataFrame([letter_percentages])
+
+        # Concatenate the new row to the existing DataFrame
+        df = pd.concat([df, new_row], ignore_index=True)
+
+        # Save the updated DataFrame to the Excel file
+        df.to_excel(excel_file, index=False)
+
+        print(f"Data saved to {excel_file}")
+
+        # Reset the incorrect letter counts and total letters count for the next image
+        incorrect_letter_counts.clear()
+        total_letter_counts.clear()
 
 # Start monitoring the image directory for new files
 event_handler = NewImageHandler()

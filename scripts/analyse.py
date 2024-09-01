@@ -76,7 +76,15 @@ class NewImageHandler(FileSystemEventHandler):
         # Ignore directories and non-image files
         if event.is_directory or not (event.src_path.endswith('.png') or event.src_path.endswith('.jpg')):
             return
-
+        time.sleep(2)# Check if the file size is stable (not still being written)
+        initial_size = -1
+        while True:
+            current_size = os.path.getsize(event.src_path)
+            if current_size == initial_size:
+                break
+            initial_size = current_size
+            time.sleep(1)
+            
         print(f"New image detected: {event.src_path}")
 
         # Read the image as grayscale

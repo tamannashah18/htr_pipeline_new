@@ -125,7 +125,11 @@ class NewImageHandler(FileSystemEventHandler):
 
         # Load existing data if the Excel file exists, otherwise create a new DataFrame
         if os.path.exists(excel_file):
-            df = pd.read_excel(excel_file)
+            try:
+                df = pd.read_excel(excel_file)
+            except Exception as e:
+                print(f"Failed to read the Excel file: {e}")
+                df = pd.DataFrame(columns=['timestamp'] + list('abcdefghijklmnopqrstuvwxyz'))
         else:
             df = pd.DataFrame(columns=['timestamp'] + list('abcdefghijklmnopqrstuvwxyz'))
 
@@ -136,9 +140,13 @@ class NewImageHandler(FileSystemEventHandler):
         df = pd.concat([df, new_row], ignore_index=True)
 
         # Save the updated DataFrame to the Excel file
-        df.to_excel(excel_file, index=False)
+        try:
+            df.to_excel(excel_file, index=False)
+            print(f"Data successfully saved to {excel_file}")
+        except Exception as e:
+            print(f"Failed to save data to the Excel file: {e}")
 
-        print(f"Data saved to {excel_file}")
+        # Reset the incorrect letter counts and total letters count for the next image
 
         # Analyze and print the results
         analyze_and_print_results()

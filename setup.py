@@ -14,7 +14,8 @@ setup(
                       'scikit-learn',
                       'editdistance',
                       'autocorrect',
-                      'path'],
+                      'path',
+                      ],
     python_requires='>=3.8',
     package_data={'htr_pipeline.models': ['*']}
 )

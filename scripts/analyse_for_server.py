@@ -7,6 +7,7 @@ import google.generativeai as genai
 import pandas as pd
 from datetime import datetime
 import argparse
+import json
 
 # Initialize the Gemini model
 genai.configure(api_key="AIzaSyBPhRoY7S2I35q460jQTcbLVYcxccPB2Go")
@@ -59,30 +60,42 @@ def read_text_from_file(file_path):
     with open(file_path, 'r') as file:
         return file.read()
 
-def analyze_and_print_results():
-    print("\nTabular Analysis of Incorrect Letters:")
-    print(f"{'Letter':<10}{'Total Occurrences':<20}{'Incorrect Occurrences':<25}{'Percentage of Inaccuracy':<25}")
-
+def analyze_and_return_results():
     letters_to_practice = []
+
+    analysis_results = {
+        "letter_analysis": [],
+        "letters_to_practice": []
+    }
 
     for letter in 'abcdefghijklmnopqrstuvwxyz':
         total_count = total_letter_counts.get(letter, 0)
         incorrect_count = incorrect_letter_counts.get(letter, 0)
         inaccuracy_percentage = (incorrect_count / total_count) * 100 if total_count > 0 else 0
 
-        print(f"{letter:<10}{total_count:<20}{incorrect_count:<25}{inaccuracy_percentage:.2f}%")
+        analysis_results["letter_analysis"].append({
+            "letter": letter,
+            "total_occurrences": total_count,
+            "incorrect_occurrences": incorrect_count,
+            "percentage_of_inaccuracy": round(inaccuracy_percentage, 2)
+        })
 
         if inaccuracy_percentage > 50:
             letters_to_practice.append(letter)
 
-    if letters_to_practice:
-        print("\nThe letters that need to be practiced:")
-        print(", ".join(letters_to_practice))
-    else:
-        print("\nNo letters need extra practice at this time.")
+    analysis_results["letters_to_practice"] = letters_to_practice
+
+    return analysis_results
 
 def process_image(image_path):
     global total_letter_counts, incorrect_letter_counts
+
+    # Initialize a dictionary to store the result
+    result = {
+        "status": "success",
+        "message": "",
+        "data": {}
+    }
 
     print(f"Processing image: {image_path}")
 
@@ -91,8 +104,9 @@ def process_image(image_path):
 
     # Check if the image was loaded successfully
     if img is None:
-        print(f"Failed to load image: {image_path}. Please check the file path or image integrity.")
-        return
+        result["status"] = "error"
+        result["message"] = f"Failed to load image: {image_path}. Please check the file path or image integrity."
+        return result
 
     # Perform text recognition on the image
     read_lines = read_page(img, DetectorConfig(scale=0.4, margin=5), 
@@ -135,8 +149,9 @@ def process_image(image_path):
         try:
             df = pd.read_excel(excel_file)
         except Exception as e:
-            print(f"Failed to read the Excel file: {e}")
-            df = pd.DataFrame(columns=['timestamp'] + list('abcdefghijklmnopqrstuvwxyz'))
+            result["status"] = "error"
+            result["message"] = f"Failed to read the Excel file: {e}"
+            return result
     else:
         df = pd.DataFrame(columns=['timestamp'] + list('abcdefghijklmnopqrstuvwxyz'))
 
@@ -151,14 +166,26 @@ def process_image(image_path):
         df.to_excel(excel_file, index=False)
         print(f"Data successfully saved to {excel_file}")
     except Exception as e:
-        print(f"Failed to save data to the Excel file: {e}")
+        result["status"] = "error"
+        result["message"] = f"Failed to save data to the Excel file: {e}"
+        return result
 
-    # Analyze and print the results
-    analyze_and_print_results()
+    # Analyze and get the results
+    analysis_results = analyze_and_return_results()
+
+    # Add the analysis results to the result dictionary
+    result["data"] = {
+        "extracted_sentence": extracted_sentence,
+        "corrected_sentence": corrected_sentence,
+        "letter_analysis": analysis_results["letter_analysis"],
+        "letters_to_practice": analysis_results["letters_to_practice"]
+    }
 
     # Reset the incorrect letter counts and total letters count for the next image
     incorrect_letter_counts.clear()
     total_letter_counts.clear()
+
+    return result
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process an image for OCR and text correction.")
@@ -167,9 +194,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if not os.path.exists(args.image_path):
-        print(f"Error: The file {args.image_path} does not exist.")
+        print(json.dumps({"status": "error", "message": f"The file {args.image_path} does not exist."}))
         exit(1)
 
     # Process the image provided as a command-line argument
-    process_image(args.image_path)
- 
+    result = process_image(args.image_path)
+    print(json.dumps(result, indent=4))

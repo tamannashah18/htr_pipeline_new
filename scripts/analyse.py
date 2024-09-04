@@ -56,7 +56,6 @@ def compare_and_track_incorrect_letters(extracted_sentence, corrected_sentence):
                 if corrected_letter.isalpha():
                     total_letter_counts[corrected_letter] = total_letter_counts.get(corrected_letter, 0) + 1
 
-
 def read_text_from_file(file_path):
     with open(file_path, 'r') as file:
         return file.read()

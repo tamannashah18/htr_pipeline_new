@@ -200,3 +200,4 @@ if __name__ == "__main__":
     # Process the image provided as a command-line argument
     result = process_image(args.image_path)
     print(json.dumps(result, indent=4))
+    return result
